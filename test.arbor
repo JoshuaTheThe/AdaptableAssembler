@@ -1,9 +1,2 @@
 fn main()
-        if a
-        {
-                a;
-        }
-        else if k
-        {
-                b;
-        }
+        let x [8]int;

@@ -1,5 +1,19 @@
 #include "parser.h"
 
+_Noreturn static void TODO(const char *x)
+{
+        printf("TODO: %s\n", x);
+        exit(1);
+}
+
+static SIZE Count(EXPRESSION *Expr)
+{
+        SIZE k = 0;
+        while (Expr)
+                (void)k++, Expr = Expr->Next;
+        return k;
+}
+
 static EXPRESSION *Literal(SIZE Value)
 {
         EXPRESSION *Expr = new (EXPRESSION);
@@ -55,6 +69,35 @@ static EXPRESSION *If(EXPRESSION *Body, EXPRESSION *ElseBody, EXPRESSION *Condit
         return (Expr);
 }
 
+static EXPRESSION *Unary(EXPRESSION *UnaryExpr, TOKENTYPE Op)
+{
+        EXPRESSION *Expr = new (EXPRESSION);
+        Expr->Type = EXPR_TYPE_UNARY_OP;
+        Expr->as.unary.Operand = UnaryExpr;
+        Expr->as.unary.Operator = Op;
+        return (Expr);
+}
+
+static EXPRESSION *Declaration(char *Name, EXPRESSION *Init, TYPE Type)
+{
+        EXPRESSION *Expr = new (EXPRESSION);
+        Expr->Type = EXPR_TYPE_DECLARATION;
+        Expr->as.declaration.Init = Init;
+        Expr->as.declaration.Name = Name;
+        Expr->as.declaration.Type = Type;
+        return (Expr);
+}
+
+static EXPRESSION *Call(EXPRESSION *Callee, EXPRESSION *Args)
+{
+        EXPRESSION *Expr = new (EXPRESSION);
+        Expr->Type = EXPR_TYPE_CALL;
+        Expr->as.call.Callee = Callee;
+        Expr->as.call.Args = Args;
+        Expr->as.call.ArgCount = Count(Args);
+        return (Expr);
+}
+
 static void AppendExpr(EXPRESSION **restrict Dest, EXPRESSION *restrict Source)
 {
         EXPRESSION *End = *Dest;
@@ -88,23 +131,90 @@ EXPRESSION *ParseFactor(ArborState *State)
         }
         else if (AcceptsToken(State->CurrentToken, State, TOKEN_IDENTIFIER))
         {
-                Expr = Variable(strdup(State->CurrentToken.Identifier));
+                char *Name = strdup(State->CurrentToken.Identifier);
+                Expr = Variable(Name);
                 State->CurrentToken = GetToken(State);
         }
 
         return Expr;
 }
 
+EXPRESSION *ParseArguments(ArborState *State)
+{
+        EXPRESSION *Expressions = NULL, *Expr = NULL;
+
+        if (State->CurrentToken.Type == TOKEN_EXPR_RPAREN)
+                return NULL;
+
+        Expr = ParseExpression(State);
+        AppendExpr(&Expressions, Expr);
+
+        while (State->CurrentToken.Type == TOKEN_EXPR_COMMA)
+        {
+                State->CurrentToken = GetToken(State);
+                Expr = ParseExpression(State);
+                AppendExpr(&Expressions, Expr);
+        }
+
+        return Expressions;
+}
+
+EXPRESSION *ParseSuffix(ArborState *State, EXPRESSION *Expr)
+{
+        EXPRESSION *Callee = Expr, *Arguments;
+        if (State->CurrentToken.Type == TOKEN_EXPR_LPAREN)
+        {
+                State->CurrentToken = GetToken(State);
+                Arguments = ParseArguments(State);
+                State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_EXPR_RPAREN);
+                Expr = Call(Callee, Arguments);
+        }
+
+        return Expr;
+}
+
+EXPRESSION *ParsePrefix(ArborState *State)
+{
+        EXPRESSION *Expr = NULL;
+        if (State->CurrentToken.Type == TOKEN_EXPR_SUB)
+        {
+                State->CurrentToken = GetToken(State);
+                Expr = Unary(ParseFactor(State), TOKEN_EXPR_SUB);
+        }
+        else if (State->CurrentToken.Type == TOKEN_EXPR_NOT)
+        {
+                State->CurrentToken = GetToken(State);
+                Expr = Unary(ParseFactor(State), TOKEN_EXPR_NOT);
+        }
+        else if (State->CurrentToken.Type == TOKEN_EXPR_COMPLEMENT)
+        {
+                State->CurrentToken = GetToken(State);
+                Expr = Unary(ParseFactor(State), TOKEN_EXPR_COMPLEMENT);
+        }
+        else if (State->CurrentToken.Type == TOKEN_EXPR_MUL)
+        {
+                State->CurrentToken = GetToken(State);
+                Expr = Unary(ParseFactor(State), TOKEN_EXPR_MUL);
+        }
+        else
+        {
+                Expr = ParseFactor(State);
+        }
+
+        Expr = ParseSuffix(State, Expr);
+        return Expr;
+}
+
 EXPRESSION *ParseTerm(ArborState *State)
 {
-        EXPRESSION *Left = ParseFactor(State), *Right = NULL;
+        EXPRESSION *Left = ParsePrefix(State), *Right = NULL;
         while (State->CurrentToken.Type == TOKEN_EXPR_MUL ||
                State->CurrentToken.Type == TOKEN_EXPR_DIV)
         {
                 TOKENTYPE Op = State->CurrentToken.Type;
                 State->CurrentToken = GetToken(State);
 
-                Right = ParseFactor(State);
+                Right = ParsePrefix(State);
                 Left = Binary(Left, Right, Op);
         }
 
@@ -150,7 +260,6 @@ EXPRESSION *ParseFunction(ArborState *State)
         State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_EXPR_LPAREN);
         State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_EXPR_RPAREN);
         Body = ParseStatement(State);
-
         return Function(Name, Body, Params);
 }
 
@@ -169,6 +278,66 @@ EXPRESSION *ParseIf(ArborState *State)
         return If(Body, ElseBody, Expr);
 }
 
+TYPE ParseType(ArborState *State)
+{
+        TYPE Type = {0};
+        while (State->CurrentToken.Type == TOKEN_EXPR_MUL)
+        {
+                State->CurrentToken = GetToken(State);
+                Type.Variant.Depth += 1;
+        }
+        while (State->CurrentToken.Type == TOKEN_EXPR_LSPAREN)
+        {
+                State->CurrentToken = GetToken(State);
+                if (State->CurrentToken.Type != TOKEN_NUMBER)
+                {
+                        TODO("dimension length must be a constant");
+                }
+                Type.Variant.Dim[Type.Variant.DimCount++] = State->CurrentToken.Number;
+                State->CurrentToken = GetToken(State);
+                State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_EXPR_RSPAREN);
+        }
+        if (State->CurrentToken.Type == TOKEN_INT)
+        {
+                Type.IsStructure = FALSE;
+                Type.as.normal.Bits = 32;
+                Type.as.normal.Signed = TRUE;
+                State->CurrentToken = GetToken(State);
+        }
+        else
+        {
+                TODO("variable must have a type");
+        }
+
+        return Type;
+}
+
+EXPRESSION *ParseDeclaration(ArborState *State)
+{
+        char *Name=NULL;
+        EXPRESSION *Init=NULL;
+        TYPE Type = {0};
+        if (State->CurrentToken.Type != TOKEN_IDENTIFIER)
+        {
+                TODO("Errors -- Declarations.Ident");
+                return NULL;
+        }
+
+        Name = strdup(State->CurrentToken.Identifier);
+        State->CurrentToken = GetToken(State);
+        Type = ParseType(State);
+
+        if (AcceptsToken(State->CurrentToken, State, TOKEN_EXPR_EQ))
+        {
+                State->CurrentToken = GetToken(State);
+                Init = ParseExpression(State);
+        }
+
+        State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_END);
+        return Declaration(Name, Init, Type);
+}
+
+
 EXPRESSION *ParseStatement(ArborState *State)
 {
         EXPRESSION *Expr = NULL, *Sub;
@@ -184,6 +353,7 @@ EXPRESSION *ParseStatement(ArborState *State)
                 break;
         case TOKEN_LET:
                 State->CurrentToken = GetToken(State);
+                Expr = ParseDeclaration(State);
                 break;
         case TOKEN_EXPR_LCPAREN:
                 State->CurrentToken = GetToken(State);
@@ -205,7 +375,7 @@ EXPRESSION *ParseStatement(ArborState *State)
                 break;
         }
 
-        return(Expr);
+        return (Expr);
 }
 
 EXPRESSION *ParseStatements(ArborState *State)
@@ -251,7 +421,6 @@ void DisplayExpression(EXPRESSION *Expr)
                 printf("(");
                 DisplayExpression(Expr->as.binary.Lhs);
 
-                // Print operator based on token type
                 switch (Expr->as.binary.Operator)
                 {
                 case TOKEN_EXPR_ADD:
@@ -266,7 +435,6 @@ void DisplayExpression(EXPRESSION *Expr)
                 case TOKEN_EXPR_DIV:
                         printf(" / ");
                         break;
-                // Add more operators as needed
                 default:
                         printf(" ? ");
                         break;
@@ -305,6 +473,35 @@ void DisplayExpressionTree(EXPRESSION *Expr, int Depth)
 
         switch (Expr->Type)
         {
+        case EXPR_TYPE_DECLARATION:
+                printf("Declare, ");
+                printf("%s ", Expr->as.declaration.Name);
+                for (int i = 0; i < Expr->as.declaration.Type.Variant.Depth; ++i)
+                {
+                        printf("*");
+                }
+                for (int i = 0; i < Expr->as.declaration.Type.Variant.DimCount; ++i)
+                {
+                        printf("[%zu]", Expr->as.declaration.Type.Variant.Dim[i]);
+                }
+
+                if (!Expr->as.declaration.Type.IsStructure)
+                        printf("u%zu\n", Expr->as.declaration.Type.as.normal.Bits);
+                else if (Expr->as.declaration.Type.as.structure.StructureName)
+                        printf("%s\n", Expr->as.declaration.Type.as.structure.StructureName);
+                DisplayExpressionTree(Expr->as.declaration.Init, Depth + 1);
+                break;
+        case EXPR_TYPE_CALL:
+                printf("Call, %zu arguments:\n", Expr->as.call.ArgCount);
+                DisplayExpressionTree(Expr->as.call.Callee, Depth + 1);
+                DisplayExpressionTree(Expr->as.call.Args, Depth + 1);
+                break;
+
+        case EXPR_TYPE_UNARY_OP:
+                printf("Unary, type %d\n", Expr->as.unary.Operator);
+                DisplayExpressionTree(Expr->as.unary.Operand, Depth + 1);
+                break;
+
         case EXPR_TYPE_NONE:
                 printf("<None>\n");
                 break;
@@ -333,6 +530,9 @@ void DisplayExpressionTree(EXPRESSION *Expr, int Depth)
                         break;
                 case TOKEN_EXPR_DIV:
                         op_str = "/";
+                        break;
+                default:
+                        op_str = "?";
                         break;
                 }
                 printf("BinaryOp: %s\n", op_str);

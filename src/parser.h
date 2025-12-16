@@ -30,6 +30,33 @@ typedef struct
         PARAM *Params;
 } PARAMS;
 
+typedef struct
+{
+        // 0 - being value
+        SIZE Depth;
+        SIZE Dim[8]; /* Dimensions, 0 being value, e.g. 2x2 */
+        SIZE DimCount;
+} TYPEVARIANT;
+
+typedef struct TYPE
+{
+        union
+        {
+                struct
+                {
+                        SIZE Bits;
+                        BOOL Signed;
+                } normal;
+
+                struct
+                {
+                        char *StructureName;
+                } structure;
+        } as;
+        TYPEVARIANT Variant;
+        BOOL IsStructure;
+} TYPE;
+
 struct EXPRESSION
 {
         union
@@ -55,7 +82,7 @@ struct EXPRESSION
                 struct
                 {
                         EXPRESSION *Callee;
-                        EXPRESSION **Args;
+                        EXPRESSION *Args;
                         SIZE ArgCount;
                 } call;
 
@@ -81,6 +108,7 @@ struct EXPRESSION
 
                 struct
                 {
+                        TYPE Type;
                         EXPRESSION *Init;
                         char *Name;
                 } declaration;
@@ -111,5 +139,10 @@ void DisplayExpressionTree(EXPRESSION *Expr, int);
 EXPRESSION *ParseAssignment(ArborState *State);
 EXPRESSION *ParseIf(ArborState *State);
 EXPRESSION *ParseStatement(ArborState *State);
+EXPRESSION *ParsePrefix(ArborState *State);
+EXPRESSION *ParseSuffix(ArborState *State, EXPRESSION *Expr);
+EXPRESSION *ParseArguments(ArborState *State);
+EXPRESSION *ParseDeclaration(ArborState *State);
+TYPE ParseType(ArborState *State);
 
 #endif

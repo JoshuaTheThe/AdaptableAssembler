@@ -79,6 +79,10 @@ typedef enum
         TOKEN_EXPR_RCPAREN,
         TOKEN_EXPR_EQ,
         TOKEN_EXPR_COMMA,
+        TOKEN_EXPR_NOT,
+        TOKEN_EXPR_COMPLEMENT,
+        TOKEN_EXPR_LSPAREN,
+        TOKEN_EXPR_RSPAREN,
 
 	TOKEN_KEYWORDS,
         TOKEN_LET=TOKEN_KEYWORDS,
@@ -87,6 +91,7 @@ typedef enum
         TOKEN_ELSE,
         TOKEN_WHILE,
         TOKEN_FOR,
+        TOKEN_INT,
 } TOKENTYPE;
 
 typedef struct TOKEN

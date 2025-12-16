@@ -10,6 +10,7 @@ static const STRING Keywords[] =
         "else",
         "while",
         "for",
+        "int",
 };
 
 static TOKEN GetNumber(ArborState *State)
@@ -102,6 +103,10 @@ TOKEN GetToken(ArborState *State)
         else if (chr == '=') { Token.Type = TOKEN_EXPR_EQ; }
         else if (chr == ';') { Token.Type = TOKEN_END; }
         else if (chr == ',') { Token.Type = TOKEN_EXPR_COMMA; }
+        else if (chr == '!') { Token.Type = TOKEN_EXPR_NOT; }
+        else if (chr == '~') { Token.Type = TOKEN_EXPR_COMPLEMENT; }
+        else if (chr == '[') { Token.Type = TOKEN_EXPR_LSPAREN; }
+        else if (chr == ']') { Token.Type = TOKEN_EXPR_RSPAREN; }
 	else if (isdigit(chr))
 	{
 		ungetc(chr, State->Assembly);
@@ -184,8 +189,7 @@ TOKEN ExpectToken(TOKEN Current, ArborState *State, TOKENTYPE Type)
         BOOL Success;
         TOKEN Next;
         if (!ValidateState(State) ||
-	    !State->Assembly ||
-	    !State->Arch)
+	    !State->Assembly)
 	{
 		goto end;
 	}
