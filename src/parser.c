@@ -26,7 +26,7 @@ static EXPRESSION *Function(char *Name, EXPRESSION *Body, PARAMS Params)
         return (Expr);
 }
 
-static EXPRESSION *Assignmment(EXPRESSION *Lhs, EXPRESSION *Rhs)
+static EXPRESSION *Assignment(EXPRESSION *Lhs, EXPRESSION *Rhs)
 {
         EXPRESSION *Expr = new (EXPRESSION);
         Expr->Type = EXPR_TYPE_ASSIGNMENT;
@@ -45,20 +45,33 @@ static EXPRESSION *Binary(EXPRESSION *Lhs, EXPRESSION *Rhs, TOKENTYPE Op)
         return (Expr);
 }
 
-static void AppendExpr(AASState *State, EXPRESSION *restrict Dest, EXPRESSION *restrict Source)
+static EXPRESSION *If(EXPRESSION *Body, EXPRESSION *ElseBody, EXPRESSION *Conditional)
 {
-        if (State->CurrentExpr == NULL)
+        EXPRESSION *Expr = new (EXPRESSION);
+        Expr->Type = EXPR_TYPE_IFELSE;
+        Expr->as.ifelse.Conditional = Conditional;
+        Expr->as.ifelse.Body = Body;
+        Expr->as.ifelse.ElseBody = ElseBody;
+        return (Expr);
+}
+
+static void AppendExpr(EXPRESSION **restrict Dest, EXPRESSION *restrict Source)
+{
+        EXPRESSION *End = *Dest;
+        if (*Dest == NULL)
         {
-                State->CurrentExpr = Source;
+                *Dest = Source;
                 return;
         }
 
-        if (Dest->Next)
-                Source->Next = Dest->Next;
-        Dest->Next = Source;
+        while (End->Next)
+        {
+                End = End->Next;
+        }
+        End->Next = Source;
 }
 
-EXPRESSION *ParseFactor(AASState *State)
+EXPRESSION *ParseFactor(ArborState *State)
 {
         EXPRESSION *Expr = NULL;
 
@@ -82,67 +95,141 @@ EXPRESSION *ParseFactor(AASState *State)
         return Expr;
 }
 
-EXPRESSION *ParseTerm(AASState *State)
+EXPRESSION *ParseTerm(ArborState *State)
 {
-        EXPRESSION *Left = ParseFactor(State);
-
+        EXPRESSION *Left = ParseFactor(State), *Right = NULL;
         while (State->CurrentToken.Type == TOKEN_EXPR_MUL ||
                State->CurrentToken.Type == TOKEN_EXPR_DIV)
         {
                 TOKENTYPE Op = State->CurrentToken.Type;
                 State->CurrentToken = GetToken(State);
 
-                EXPRESSION *Right = ParseFactor(State);
+                Right = ParseFactor(State);
                 Left = Binary(Left, Right, Op);
         }
 
         return Left;
 }
 
-EXPRESSION *ParseExpression(AASState *State)
+EXPRESSION *ParseExpression(ArborState *State)
 {
-        EXPRESSION *Left = ParseTerm(State);
+        EXPRESSION *Left = ParseTerm(State), *Right = NULL;
 
         while (State->CurrentToken.Type == TOKEN_EXPR_ADD ||
                State->CurrentToken.Type == TOKEN_EXPR_SUB)
         {
                 TOKENTYPE Op = State->CurrentToken.Type;
                 State->CurrentToken = GetToken(State);
-
-                EXPRESSION *Right = ParseTerm(State);
+                Right = ParseTerm(State);
                 Left = Binary(Left, Right, Op);
         }
 
         return Left;
 }
 
-EXPRESSION *ParseStatements(AASState *State)
+EXPRESSION *ParseAssignment(ArborState *State)
 {
-        if (!ValidateState(State) ||
-            !State->Assembly ||
-            !State->Arch)
-        {
-                goto end;
-        }
-
-        do
+        EXPRESSION *Left = ParseExpression(State);
+        EXPRESSION *Right = NULL;
+        if (State->CurrentToken.Type == TOKEN_EXPR_EQ)
         {
                 State->CurrentToken = GetToken(State);
-                switch (State->CurrentToken.Type)
+                Right = ParseExpression(State);
+                return Assignment(Left, Right);
+        }
+
+        return Left;
+}
+
+EXPRESSION *ParseFunction(ArborState *State)
+{
+        char *Name = strdup(State->CurrentToken.Identifier);
+        PARAMS Params = {0};
+        EXPRESSION *Body;
+        State->CurrentToken = GetToken(State);
+        State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_EXPR_LPAREN);
+        State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_EXPR_RPAREN);
+        Body = ParseStatement(State);
+
+        return Function(Name, Body, Params);
+}
+
+EXPRESSION *ParseIf(ArborState *State)
+{
+        EXPRESSION *Body, *Expr, *ElseBody = NULL;
+        Expr = ParseExpression(State);
+        Body = ParseStatement(State);
+
+        if (State->CurrentToken.Type == TOKEN_ELSE)
+        {
+                State->CurrentToken = GetToken(State);
+                ElseBody = ParseStatement(State);
+        }
+
+        return If(Body, ElseBody, Expr);
+}
+
+EXPRESSION *ParseStatement(ArborState *State)
+{
+        EXPRESSION *Expr = NULL, *Sub;
+        switch (State->CurrentToken.Type)
+        {
+        case TOKEN_IF:
+                State->CurrentToken = GetToken(State);
+                Expr = ParseIf(State);
+                break;
+        case TOKEN_FN:
+                State->CurrentToken = GetToken(State);
+                Expr = ParseFunction(State);
+                break;
+        case TOKEN_LET:
+                State->CurrentToken = GetToken(State);
+                break;
+        case TOKEN_EXPR_LCPAREN:
+                State->CurrentToken = GetToken(State);
+                while (State->CurrentToken.Type != TOKEN_NONE && State->CurrentToken.Type != TOKEN_EXPR_RCPAREN)
                 {
-                case TOKEN_ASSEMBLY:
-                        if (State->CurrentToken.Inst && State->CurrentToken.Inst->Assemble)
-                                State->CurrentToken.Inst->Assemble();
-                        break;
-                default:
-                        DisplayExpression(ParseExpression(State));
-                        State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_END);
-                        break;
+                        Sub = ParseStatement(State);
+                        AppendExpr(&Expr, Sub);
                 }
-                FreeToken(&State->CurrentToken);
-        } while (State->CurrentToken.Type != TOKEN_NONE);
-end:
-        return NULL;
+                State->CurrentToken = GetToken(State);
+                break;
+        default:
+                Expr = ParseAssignment(State);
+                if (State->CurrentToken.Type != TOKEN_END)
+                {
+                        printf("Expected end of statement, got token type: %d\n",
+                               State->CurrentToken.Type);
+                }
+                State->CurrentToken = GetToken(State);
+                break;
+        }
+
+        return(Expr);
+}
+
+EXPRESSION *ParseStatements(ArborState *State)
+{
+        EXPRESSION *Expressions = NULL;
+
+        if (!ValidateState(State) ||
+            !State->Assembly)
+        {
+                return NULL;
+        }
+
+        while (State->CurrentToken.Type != TOKEN_NONE)
+        {
+                EXPRESSION *Expr = NULL;
+                Expr = ParseStatement(State);
+
+                if (Expr)
+                {
+                        AppendExpr(&Expressions, Expr);
+                }
+        }
+
+        return (Expressions);
 }
 
 void DisplayExpression(EXPRESSION *Expr)
@@ -197,8 +284,6 @@ void DisplayExpression(EXPRESSION *Expr)
 
         case EXPR_TYPE_FUNCTION:
                 printf("%s(", Expr->as.fun.Name);
-                // Display parameters if needed
-                // For now, just display the body
                 DisplayExpression(Expr->as.fun.Body);
                 printf(")");
                 break;
@@ -211,15 +296,19 @@ void DisplayExpression(EXPRESSION *Expr)
 
 void DisplayExpressionTree(EXPRESSION *Expr, int Depth)
 {
+        EXPRESSION *Stmt;
         if (!Expr)
                 return;
 
-        // Print indentation
         for (int i = 0; i < Depth; i++)
                 printf("  ");
 
         switch (Expr->Type)
         {
+        case EXPR_TYPE_NONE:
+                printf("<None>\n");
+                break;
+
         case EXPR_TYPE_LITERAL_NUM:
                 printf("Literal: %zu\n", Expr->as.integer_literal.Value);
                 break;
@@ -258,15 +347,50 @@ void DisplayExpressionTree(EXPRESSION *Expr, int Depth)
                 DisplayExpressionTree(Expr->as.assignment.Rhs, Depth + 1);
                 break;
 
+        case EXPR_TYPE_IFELSE:
+                printf("If-Else, Condition:\n");
+                DisplayExpressionTree(Expr->as.ifelse.Conditional, Depth + 2);
+                printf("\n");
+                for (int i = 0; i < Depth; i++)
+                        printf("  ");
+                printf("If:\n");
+                DisplayExpressionTree(Expr->as.ifelse.Body, Depth + 2);
+                printf("\n");
+                if (Expr->as.ifelse.ElseBody)
+                {
+                        for (int i = 0; i < Depth; i++)
+                                printf("  ");
+                        printf("Else:\n");
+                        DisplayExpressionTree(Expr->as.ifelse.ElseBody, Depth + 2);
+                }
+                break;
         case EXPR_TYPE_FUNCTION:
                 printf("Function: %s\n", Expr->as.fun.Name);
-                // Display parameters if you store them
+
+                if (Expr->as.fun.Params.Count > 0)
+                {
+                        for (int i = 0; i < Depth; i++)
+                                printf("  ");
+                        printf("Parameters: ");
+                        for (SIZE i = 0; i < Expr->as.fun.Params.Count; ++i)
+                        {
+                                printf("%s ", Expr->as.fun.Params.Params[i]);
+                        }
+                }
+
                 printf("Body:\n");
-                DisplayExpressionTree(Expr->as.fun.Body, Depth + 1);
+
+                Stmt = Expr->as.fun.Body;
+                DisplayExpressionTree(Stmt, Depth + 1);
                 break;
 
         default:
                 printf("Unknown Expression Type: %d\n", Expr->Type);
                 break;
+        }
+
+        if (Expr->Next)
+        {
+                DisplayExpressionTree(Expr->Next, Depth);
         }
 }

@@ -63,11 +63,9 @@ typedef enum
 	TOKEN_NONE,
 	TOKEN_NUMBER,
 	TOKEN_IDENTIFIER,
-	TOKEN_ASSEMBLY,
 	TOKEN_LABEL,
 	TOKEN_END,
 
-        /* Assemble Time Expressions */
         TOKEN_EXPR_ADD,
         TOKEN_EXPR_SUB,
         TOKEN_EXPR_MUL,
@@ -77,11 +75,22 @@ typedef enum
         TOKEN_EXPR_XOR,
         TOKEN_EXPR_LPAREN,
         TOKEN_EXPR_RPAREN,
+        TOKEN_EXPR_LCPAREN,
+        TOKEN_EXPR_RCPAREN,
+        TOKEN_EXPR_EQ,
+        TOKEN_EXPR_COMMA,
+
+	TOKEN_KEYWORDS,
+        TOKEN_LET=TOKEN_KEYWORDS,
+        TOKEN_FN,
+        TOKEN_IF,
+        TOKEN_ELSE,
+        TOKEN_WHILE,
+        TOKEN_FOR,
 } TOKENTYPE;
 
 typedef struct TOKEN
 {
-        INSTRUCTION *Inst;
 	STRING    Identifier;
 	SIZE      Number;
 	TOKENTYPE Type;
@@ -101,8 +110,8 @@ typedef struct
 	ARCHITECTURE *Arch;
         TOKEN CurrentToken;
         void *Ast;
-        void *CurrentExpr;
-} AASState;
+        void *Expressions;
+} ArborState;
 
 #ifndef NDEBUG
 #define _assert(x) assert(x)

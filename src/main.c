@@ -25,9 +25,10 @@ void *Aalloc(SIZE sz)
 int main(int argc, char **argv)
 {
         /* Checks and Init */
-        AASState State;
+        ArborState State;
         ARCHITECTURE Arch;
         INSTRUCTION Instruction;
+        EXPRESSION *Expr;
         if (argc != 3)
         {
                 printf("Invalid Usage\n%s <source> <output>\n", argv[0]);
@@ -55,13 +56,10 @@ int main(int argc, char **argv)
         State.Arch = &Arch;
 
         /* Main tokenising loop */
-        //do
-        //{
-        //        Tok = GetToken(&State);
-        //        printf("TOKEN: .type=%d .num=%zu .ident=%s\n", Tok.Type, Tok.Number, Tok.Identifier ? Tok.Identifier : "<Nil>");
-        //        FreeToken(&Tok);
-        //} while (Tok.Type != TOKEN_NONE);
-        ParseStatements(&State);
+        State.CurrentToken = GetToken(&State);
+        State.Expressions = ParseStatements(&State);
+        Expr = State.Expressions;
+        DisplayExpressionTree(Expr, 0);
 
         /* Cleanup */
 	DeleteLabels(&State);

@@ -6,8 +6,8 @@
 #include<string.h>
 #include"types.h"
 
-LABEL *InsertLabel(LABEL *Label, AASState *State);
-LABEL *CreateLabel(AASState *State);
+LABEL *InsertLabel(LABEL *Label, ArborState *State);
+LABEL *CreateLabel(ArborState *State);
 
 #endif
 

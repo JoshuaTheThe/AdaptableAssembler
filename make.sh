@@ -6,4 +6,4 @@ clang src/parser.c -o obj/parser.o -c -g0 -Wall -Wextra -pedantic -Weverything
 
 clang obj/main.o obj/label.o obj/state.o obj/token.o obj/parser.o -o bin/aas
 
-./bin/aas test.s test.bin
+./bin/aas test.arbor test.s

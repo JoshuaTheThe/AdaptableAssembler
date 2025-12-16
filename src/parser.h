@@ -15,6 +15,7 @@ typedef enum
         EXPR_TYPE_ASSIGNMENT,
         EXPR_TYPE_CALL,
         EXPR_TYPE_BINARY_OP,
+        EXPR_TYPE_IFELSE,
         EXPR_TYPE_UNARY_OP,
         EXPR_TYPE_LITERAL_NUM,
         EXPR_TYPE_DECLARATION,
@@ -63,12 +64,14 @@ struct EXPRESSION
                         EXPRESSION *Lhs;
                         EXPRESSION *Rhs;
                         TOKENTYPE Operator;
+                        int padd;
                 } binary;
 
                 struct
                 {
                         EXPRESSION *Operand;
                         TOKENTYPE Operator;
+                        int padd;
                 } unary;
 
                 struct
@@ -78,12 +81,18 @@ struct EXPRESSION
 
                 struct
                 {
-                        char *Name;
                         EXPRESSION *Init;
+                        char *Name;
                 } declaration;
+
+                struct
+                {
+                        EXPRESSION *Conditional, *Body, *ElseBody;
+                } ifelse;
         } as;
-        EXPRESSIONTYPE Type;
         EXPRESSION *Next;
+        EXPRESSIONTYPE Type;
+        int padd;
 };
 
 struct AST
@@ -92,11 +101,15 @@ struct AST
         EXPRESSION *RootExpr;
 };
 
-EXPRESSION *ParseStatements(AASState *State);
-EXPRESSION *ParseExpression(AASState *State);
-EXPRESSION *ParseTerm(AASState *State);
-EXPRESSION *ParseFactor(AASState *State);
+EXPRESSION *ParseFunction(ArborState *State);
+EXPRESSION *ParseStatements(ArborState *State);
+EXPRESSION *ParseExpression(ArborState *State);
+EXPRESSION *ParseTerm(ArborState *State);
+EXPRESSION *ParseFactor(ArborState *State);
 void DisplayExpression(EXPRESSION *Expr);
 void DisplayExpressionTree(EXPRESSION *Expr, int);
+EXPRESSION *ParseAssignment(ArborState *State);
+EXPRESSION *ParseIf(ArborState *State);
+EXPRESSION *ParseStatement(ArborState *State);
 
 #endif

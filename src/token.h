@@ -9,11 +9,11 @@
 
 #define MAX_INST_LENGTH (1024)
 
-TOKEN GetToken(AASState *State);
+TOKEN GetToken(ArborState *State);
 void FreeToken(TOKEN *Token);
-TOKEN ExpectToken(TOKEN Current, AASState *State, TOKENTYPE Type);
-TOKEN AcceptToken(TOKEN Current, AASState *State, TOKENTYPE Type, BOOL *Success);
-BOOL AcceptsToken(TOKEN Current, AASState *State, TOKENTYPE Type);
+TOKEN ExpectToken(TOKEN Current, ArborState *State, TOKENTYPE Type);
+TOKEN AcceptToken(TOKEN Current, ArborState *State, TOKENTYPE Type, BOOL *Success);
+BOOL AcceptsToken(TOKEN Current, ArborState *State, TOKENTYPE Type);
 
 #endif
 

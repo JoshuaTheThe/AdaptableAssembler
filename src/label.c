@@ -4,7 +4,7 @@
 #include"state.h"
 #include"label.h"
 
-LABEL *InsertLabel(LABEL *Label, AASState *State)
+LABEL *InsertLabel(LABEL *Label, ArborState *State)
 {
 	_assert(ValidateState(State));
 	_assert(Label && Label->CheckSum == LABEL_CHECKSUM);
@@ -43,7 +43,7 @@ LABEL *InsertLabel(LABEL *Label, AASState *State)
 	return(Label);
 }
 
-LABEL *CreateLabel(AASState *State)
+LABEL *CreateLabel(ArborState *State)
 {
 	LABEL *NewLabel = (LABEL*)calloc(1, sizeof(*NewLabel));
 	_assert(State);

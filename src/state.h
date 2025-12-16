@@ -9,10 +9,10 @@
 /**
  * Return whether the state is valid.
  * */
-BOOL ValidateState(AASState *State);
-BOOL ValidateLabels(AASState *State);
-AASState NewState(void);
-BOOL DeleteLabels(AASState *State);
+BOOL ValidateState(ArborState *State);
+BOOL ValidateLabels(ArborState *State);
+ArborState NewState(void);
+BOOL DeleteLabels(ArborState *State);
 
 #endif
 

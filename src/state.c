@@ -1,7 +1,7 @@
 #include"state.h"
 #include"label.h"
 
-BOOL ValidateLabels(AASState *State)
+BOOL ValidateLabels(ArborState *State)
 {
 	LABEL *Label = NULL;
 	_assert(State && State->CheckSum == STATE_CHECKSUM);
@@ -26,7 +26,7 @@ BOOL ValidateLabels(AASState *State)
 	return(TRUE);
 }
 
-BOOL ValidateState(AASState *State)
+BOOL ValidateState(ArborState *State)
 {
 	_assert(State && State->CheckSum == STATE_CHECKSUM);
 	if (State && State->CheckSum == STATE_CHECKSUM && ValidateLabels(State))
@@ -39,15 +39,15 @@ BOOL ValidateState(AASState *State)
 	return(FALSE);
 }
 
-AASState NewState(void)
+ArborState NewState(void)
 {
-	AASState State = {0};
+	ArborState State = {0};
 	memset(&State, 0, sizeof(State));
 	State.CheckSum = STATE_CHECKSUM;
 	return(State);
 }
 
-BOOL DeleteLabels(AASState *State)
+BOOL DeleteLabels(ArborState *State)
 {
 	LABEL *Label, *Next;
 	if (!ValidateState(State))

@@ -2,7 +2,17 @@
 #include"token.h"
 #include"state.h"
 
-static TOKEN GetNumber(AASState *State)
+static const STRING Keywords[] =
+{
+        "let",
+        "fn",
+        "if",
+        "else",
+        "while",
+        "for",
+};
+
+static TOKEN GetNumber(ArborState *State)
 {
 	TOKEN Token = {0};
 	int chr;
@@ -27,7 +37,7 @@ static TOKEN GetNumber(AASState *State)
 	return(Token);
 }
 
-static TOKEN GetIdent(AASState *State)
+static TOKEN GetIdent(ArborState *State)
 {
         TOKEN Token = {0};
         SIZE Len = 0;
@@ -57,7 +67,7 @@ static TOKEN GetIdent(AASState *State)
         return(Token);
 }
 
-TOKEN GetToken(AASState *State)
+TOKEN GetToken(ArborState *State)
 {
 	TOKEN Token = {0};
 	int chr;
@@ -73,7 +83,7 @@ TOKEN GetToken(AASState *State)
         do
         {
                 chr = getc(State->Assembly);
-        } while (chr == ' ' || chr == '\t');
+        } while (chr == ' ' || chr == '\t' || chr == '\n');
 	if (chr == EOF)
 	{
 		goto end;
@@ -87,7 +97,11 @@ TOKEN GetToken(AASState *State)
         else if (chr == '^') { Token.Type = TOKEN_EXPR_XOR; }
         else if (chr == '(') { Token.Type = TOKEN_EXPR_LPAREN; }
         else if (chr == ')') { Token.Type = TOKEN_EXPR_RPAREN; }
-        else if (chr == '\n') { Token.Type = TOKEN_END; }
+        else if (chr == '{') { Token.Type = TOKEN_EXPR_LCPAREN; }
+        else if (chr == '}') { Token.Type = TOKEN_EXPR_RCPAREN; }
+        else if (chr == '=') { Token.Type = TOKEN_EXPR_EQ; }
+        else if (chr == ';') { Token.Type = TOKEN_END; }
+        else if (chr == ',') { Token.Type = TOKEN_EXPR_COMMA; }
 	else if (isdigit(chr))
 	{
 		ungetc(chr, State->Assembly);
@@ -105,12 +119,11 @@ TOKEN GetToken(AASState *State)
                 else
                 {
                         ungetc(chr, State->Assembly);
-                        for (SIZE i = 0; i < State->Arch->InstructionCount; ++i)
+                        for (SIZE i = 0; i < sizeof(Keywords)/sizeof(*Keywords); ++i)
                         {
-                                if (!strncmp(State->Arch->Instructions[i].Mnemonic, Token.Identifier, MAX_INST_LENGTH))
+                                if (!strncmp(Keywords[i], Token.Identifier, MAX_INST_LENGTH))
                                 {
-                                        Token.Type = TOKEN_ASSEMBLY;
-                                        Token.Inst = &State->Arch->Instructions[i];
+                                        Token.Type = TOKEN_KEYWORDS + (TOKENTYPE)i;
                                         break;
                                 }
                         }
@@ -124,13 +137,13 @@ void FreeToken(TOKEN *Token)
 {
         if (Token->Type == TOKEN_IDENTIFIER || 
                 Token->Type == TOKEN_LABEL || 
-                Token->Type == TOKEN_ASSEMBLY)
+                Token->Type >= TOKEN_KEYWORDS)
         {
                 free(Token->Identifier);
         }
 }
 
-TOKEN AcceptToken(TOKEN Current, AASState *State, TOKENTYPE Type, BOOL *Success)
+TOKEN AcceptToken(TOKEN Current, ArborState *State, TOKENTYPE Type, BOOL *Success)
 {
         if (!ValidateState(State) ||
 	    !State->Assembly ||
@@ -149,7 +162,7 @@ end:
         return(TOKEN){0};
 }
 
-BOOL AcceptsToken(TOKEN Current, AASState *State, TOKENTYPE Type)
+BOOL AcceptsToken(TOKEN Current, ArborState *State, TOKENTYPE Type)
 {
         if (!ValidateState(State) ||
 	    !State->Assembly ||
@@ -166,7 +179,7 @@ end:
         return(FALSE);
 }
 
-TOKEN ExpectToken(TOKEN Current, AASState *State, TOKENTYPE Type)
+TOKEN ExpectToken(TOKEN Current, ArborState *State, TOKENTYPE Type)
 {
         BOOL Success;
         TOKEN Next;
