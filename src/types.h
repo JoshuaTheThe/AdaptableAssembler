@@ -7,6 +7,9 @@
 #include<unistd.h>
 #include<assert.h>
 
+#define new(T)\
+        Aalloc(sizeof (T))
+
 typedef size_t SIZE;
 typedef char *STRING;
 typedef _Bool BOOL;
@@ -22,15 +25,17 @@ typedef struct
 {
 	STRING Name;
 	STRING Description;
+	STRING Mnemonic;
 	void (*Assemble)(void);
 } INSTRUCTION;
 
 typedef struct
 {
+	INSTRUCTION *Instructions;
 	STRING Name;
 	STRING Desc;
 	REAL   Version;
-	INSTRUCTION *Instructions;
+        SIZE   InstructionCount;
 } ARCHITECTURE;
 
 typedef enum
@@ -53,6 +58,36 @@ typedef struct LABEL
 	int     Padd;
 } LABEL;
 
+typedef enum
+{
+	TOKEN_NONE,
+	TOKEN_NUMBER,
+	TOKEN_IDENTIFIER,
+	TOKEN_ASSEMBLY,
+	TOKEN_LABEL,
+	TOKEN_END,
+
+        /* Assemble Time Expressions */
+        TOKEN_EXPR_ADD,
+        TOKEN_EXPR_SUB,
+        TOKEN_EXPR_MUL,
+        TOKEN_EXPR_DIV,
+        TOKEN_EXPR_AND,
+        TOKEN_EXPR_OR,
+        TOKEN_EXPR_XOR,
+        TOKEN_EXPR_LPAREN,
+        TOKEN_EXPR_RPAREN,
+} TOKENTYPE;
+
+typedef struct TOKEN
+{
+        INSTRUCTION *Inst;
+	STRING    Identifier;
+	SIZE      Number;
+	TOKENTYPE Type;
+	int       Padd;
+} TOKEN;
+
 typedef struct
 {
 	/**
@@ -64,6 +99,9 @@ typedef struct
 	FILE  *Assembly;
 	FILE  *Output;
 	ARCHITECTURE *Arch;
+        TOKEN CurrentToken;
+        void *Ast;
+        void *CurrentExpr;
 } AASState;
 
 #ifndef NDEBUG
@@ -71,6 +109,8 @@ typedef struct
 #else
 #define _assert(x) if (!x) { printf("Assert Failed %s %s\n", __func__, __FILE__);  }
 #endif
+
+void *Aalloc(SIZE sz);
 
 #endif
 

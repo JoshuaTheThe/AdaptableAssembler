@@ -7,24 +7,13 @@
 #include"types.h"
 #include"arch.h"
 
-typedef enum
-{
-	TOKEN_NONE,
-	TOKEN_NUMBER,
-	TOKEN_IDENTIFIER,
-	TOKEN_ASSEMBLY
-} TOKENTYPE;
-
-typedef struct
-{
-	STRING    Identifier;
-	SIZE      Number;
-	SIZE      Offset;
-	TOKENTYPE Type;
-	int       Padd;
-} TOKEN;
+#define MAX_INST_LENGTH (1024)
 
 TOKEN GetToken(AASState *State);
+void FreeToken(TOKEN *Token);
+TOKEN ExpectToken(TOKEN Current, AASState *State, TOKENTYPE Type);
+TOKEN AcceptToken(TOKEN Current, AASState *State, TOKENTYPE Type, BOOL *Success);
+BOOL AcceptsToken(TOKEN Current, AASState *State, TOKENTYPE Type);
 
 #endif
 
