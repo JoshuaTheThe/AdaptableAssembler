@@ -476,11 +476,11 @@ void DisplayExpressionTree(EXPRESSION *Expr, int Depth)
         case EXPR_TYPE_DECLARATION:
                 printf("Declare, ");
                 printf("%s ", Expr->as.declaration.Name);
-                for (int i = 0; i < Expr->as.declaration.Type.Variant.Depth; ++i)
+                for (SIZE i = 0; i < Expr->as.declaration.Type.Variant.Depth; ++i)
                 {
                         printf("*");
                 }
-                for (int i = 0; i < Expr->as.declaration.Type.Variant.DimCount; ++i)
+                for (SIZE i = 0; i < Expr->as.declaration.Type.Variant.DimCount; ++i)
                 {
                         printf("[%zu]", Expr->as.declaration.Type.Variant.Dim[i]);
                 }

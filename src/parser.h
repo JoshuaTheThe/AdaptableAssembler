@@ -47,7 +47,6 @@ typedef struct TYPE
                         SIZE Bits;
                         BOOL Signed;
                 } normal;
-
                 struct
                 {
                         char *StructureName;
@@ -134,8 +133,6 @@ EXPRESSION *ParseStatements(ArborState *State);
 EXPRESSION *ParseExpression(ArborState *State);
 EXPRESSION *ParseTerm(ArborState *State);
 EXPRESSION *ParseFactor(ArborState *State);
-void DisplayExpression(EXPRESSION *Expr);
-void DisplayExpressionTree(EXPRESSION *Expr, int);
 EXPRESSION *ParseAssignment(ArborState *State);
 EXPRESSION *ParseIf(ArborState *State);
 EXPRESSION *ParseStatement(ArborState *State);
@@ -144,5 +141,7 @@ EXPRESSION *ParseSuffix(ArborState *State, EXPRESSION *Expr);
 EXPRESSION *ParseArguments(ArborState *State);
 EXPRESSION *ParseDeclaration(ArborState *State);
 TYPE ParseType(ArborState *State);
+void DisplayExpression(EXPRESSION *Expr);
+void DisplayExpressionTree(EXPRESSION *Expr, int);
 
 #endif
