@@ -1,2 +1,5 @@
-fn main()
-        let x [8]int;
+fn main(argc int, argv **int)
+{
+        let buff [256]int8;
+        print("Hello, World!");
+}

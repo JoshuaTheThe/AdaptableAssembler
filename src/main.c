@@ -1,12 +1,12 @@
-#include<stdio.h>
-#include<stdlib.h>
-#include<unistd.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
 
-#include"types.h"
-#include"label.h"
-#include"state.h"
-#include"token.h"
-#include"parser.h"
+#include "types.h"
+#include "label.h"
+#include "state.h"
+#include "token.h"
+#include "parser.h"
 
 void AssembleFoo(void);
 
@@ -35,7 +35,7 @@ int main(int argc, char **argv)
                 return 1;
         }
 
-	State = NewState();
+        State = NewState();
         State.Assembly = fopen(argv[1], "r");
         if (!State.Assembly)
         {
@@ -44,13 +44,13 @@ int main(int argc, char **argv)
         }
 
         Instruction.Assemble = AssembleFoo;
-        Instruction.Name = (STRING)"Foo";
-        Instruction.Description = (STRING)"Testing";
-        Instruction.Mnemonic = (STRING)"FOO";
+        Instruction.Name = (STRING) "Foo";
+        Instruction.Description = (STRING) "Testing";
+        Instruction.Mnemonic = (STRING) "FOO";
         Arch.InstructionCount = 1;
         Arch.Instructions = &Instruction;
-        Arch.Name = (STRING)"FOO Machine";
-        Arch.Desc = (STRING)"Desc";
+        Arch.Name = (STRING) "FOO Machine";
+        Arch.Desc = (STRING) "Desc";
         Arch.Version = 1.0;
 
         State.Arch = &Arch;
@@ -62,8 +62,7 @@ int main(int argc, char **argv)
         DisplayExpressionTree(Expr, 0);
 
         /* Cleanup */
-	DeleteLabels(&State);
+        DeleteLabels(&State);
         fclose(State.Assembly);
-	return(0);
+        return (0);
 }
-

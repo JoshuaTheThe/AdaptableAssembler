@@ -18,12 +18,15 @@ typedef enum
         EXPR_TYPE_IFELSE,
         EXPR_TYPE_UNARY_OP,
         EXPR_TYPE_LITERAL_NUM,
+        EXPR_TYPE_LITERAL_STR,
+        EXPR_TYPE_LITERAL_REAL,
         EXPR_TYPE_DECLARATION,
+        EXPR_TYPE_STRUCTURE,
 } EXPRESSIONTYPE;
 
 typedef struct EXPRESSION EXPRESSION;
 
-typedef char *PARAM;
+typedef EXPRESSION *PARAM;
 typedef struct
 {
         SIZE Count;
@@ -62,7 +65,7 @@ struct EXPRESSION
         {
                 struct
                 {
-                        PARAMS Params;
+                        EXPRESSION *Params;
                         EXPRESSION *Body;
                         char *Name;
                 } fun;
@@ -107,6 +110,17 @@ struct EXPRESSION
 
                 struct
                 {
+                        double Value;
+                } real_literal;
+
+                struct
+                {
+                        const char *Data;
+                        SIZE Value;
+                } string_literal;
+
+                struct
+                {
                         TYPE Type;
                         EXPRESSION *Init;
                         char *Name;
@@ -116,6 +130,12 @@ struct EXPRESSION
                 {
                         EXPRESSION *Conditional, *Body, *ElseBody;
                 } ifelse;
+
+                struct
+                {
+                        EXPRESSION *Body;
+                        char *Name;
+                } structure;
         } as;
         EXPRESSION *Next;
         EXPRESSIONTYPE Type;
@@ -143,5 +163,6 @@ EXPRESSION *ParseDeclaration(ArborState *State);
 TYPE ParseType(ArborState *State);
 void DisplayExpression(EXPRESSION *Expr);
 void DisplayExpressionTree(EXPRESSION *Expr, int);
+EXPRESSION *ParseStruct(ArborState *State);
 
 #endif
