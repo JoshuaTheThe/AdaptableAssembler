@@ -42,17 +42,18 @@ static EXPRESSION *Variable(char *Name)
 {
         EXPRESSION *Expr = new (EXPRESSION);
         Expr->Type = EXPR_TYPE_VAR;
-        Expr->as.var.Name = Name;
+        Expr->as.variable.Name = Name;
         return (Expr);
 }
 
-static EXPRESSION *Function(char *Name, EXPRESSION *Body, EXPRESSION *Params)
+static EXPRESSION *Function(char *Name, EXPRESSION *Body, EXPRESSION *Params, TYPE ReturnType)
 {
         EXPRESSION *Expr = new (EXPRESSION);
         Expr->Type = EXPR_TYPE_FUNCTION;
         Expr->as.fun.Name = Name;
         Expr->as.fun.Body = Body;
         Expr->as.fun.Params = Params;
+        Expr->as.fun.ReturnType = ReturnType;
         return (Expr);
 }
 
@@ -120,6 +121,23 @@ static EXPRESSION *Call(EXPRESSION *Callee, EXPRESSION *Args)
         Expr->as.call.Callee = Callee;
         Expr->as.call.Args = Args;
         Expr->as.call.ArgCount = Count(Args);
+        return (Expr);
+}
+
+static EXPRESSION *Access(EXPRESSION *Expression, EXPRESSION *Index)
+{
+        EXPRESSION *Expr = new (EXPRESSION);
+        Expr->Type = EXPR_TYPE_ACCESS;
+        Expr->as.access.Expr = Expression;
+        Expr->as.access.Index = Index;
+        return (Expr);
+}
+
+static EXPRESSION *Return(EXPRESSION *Expression)
+{
+        EXPRESSION *Expr = new (EXPRESSION);
+        Expr->Type = EXPR_TYPE_RETURN;
+        Expr->as.return_statement = Expression;
         return (Expr);
 }
 
@@ -196,13 +214,22 @@ EXPRESSION *ParseArguments(ArborState *State)
 
 EXPRESSION *ParseSuffix(ArborState *State, EXPRESSION *Expr)
 {
-        EXPRESSION *Callee = Expr, *Arguments;
+        EXPRESSION *Initial = Expr, *Arguments;
         if (State->CurrentToken.Type == TOKEN_EXPR_LPAREN)
         {
                 State->CurrentToken = GetToken(State);
                 Arguments = ParseArguments(State);
                 State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_EXPR_RPAREN);
-                Expr = Call(Callee, Arguments);
+                Expr = Call(Initial, Arguments);
+                return ParseSuffix(State, Expr);
+        }
+        else if (State->CurrentToken.Type == TOKEN_EXPR_LSPAREN)
+        {
+                State->CurrentToken = GetToken(State);
+                Arguments = ParseArguments(State);
+                State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_EXPR_RSPAREN);
+                Expr = Access(Initial, Arguments);
+                return ParseSuffix(State, Expr);
         }
 
         return Expr;
@@ -306,8 +333,9 @@ EXPRESSION *ParseFunction(ArborState *State)
                 }
         }
         State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_EXPR_RPAREN);
+        TYPE Type = ParseType(State);
         Body = ParseStatement(State);
-        return Function(Name, Body, Params);
+        return Function(Name, Body, Params, Type);
 }
 
 EXPRESSION *ParseIf(ArborState *State)
@@ -344,26 +372,38 @@ TYPE ParseType(ArborState *State)
                 State->CurrentToken = GetToken(State);
                 State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_EXPR_RSPAREN);
         }
+        if (State->CurrentToken.Type == TOKEN_CONSTANT)
+        {
+                Type.Constant = TRUE;
+                State->CurrentToken = GetToken(State);
+        }
+
+        if (State->CurrentToken.Type == TOKEN_UNSIGNED)
+        {
+                Type.as.normal.Signed = FALSE;
+                State->CurrentToken = GetToken(State);
+        }
+        else
+        {
+                Type.as.normal.Signed = TRUE;
+        }
+
         if (State->CurrentToken.Type == TOKEN_INT)
         {
                 Type.IsStructure = FALSE;
                 Type.as.normal.Bits = 32;
-                Type.as.normal.Signed = TRUE;
                 State->CurrentToken = GetToken(State);
         }
         else if (State->CurrentToken.Type == TOKEN_INT16)
         {
                 Type.IsStructure = FALSE;
                 Type.as.normal.Bits = 16;
-                Type.as.normal.Signed = TRUE;
                 State->CurrentToken = GetToken(State);
         }
         else if (State->CurrentToken.Type == TOKEN_INT8)
         {
                 Type.IsStructure = FALSE;
                 Type.as.normal.Bits = 8;
-                
-                Type.as.normal.Signed = TRUE;
                 State->CurrentToken = GetToken(State);
         }
         else if (State->CurrentToken.Type == TOKEN_IDENTIFIER)
@@ -420,11 +460,26 @@ EXPRESSION *ParseStruct(ArborState *State)
         return Structure(Name, Body);
 }
 
+EXPRESSION *ParseReturn(ArborState *State)
+{
+        return Return(ParseExpression(State));
+}
+
 EXPRESSION *ParseStatement(ArborState *State)
 {
         EXPRESSION *Expr = NULL, *Sub;
         switch (State->CurrentToken.Type)
         {
+        case TOKEN_RETURN:
+                State->CurrentToken = GetToken(State);
+                Expr = ParseReturn(State);
+                if (State->CurrentToken.Type != TOKEN_END)
+                {
+                        printf("Expected end of statement, got token type: %d\n",
+                               State->CurrentToken.Type);
+                }
+                State->CurrentToken = GetToken(State);
+                break;
         case TOKEN_STRUCT:
                 State->CurrentToken = GetToken(State);
                 Expr = ParseStruct(State);
@@ -488,69 +543,6 @@ EXPRESSION *ParseStatements(ArborState *State)
         return (Expressions);
 }
 
-void DisplayExpression(EXPRESSION *Expr)
-{
-        if (!Expr)
-                return;
-
-        switch (Expr->Type)
-        {
-        case EXPR_TYPE_LITERAL_REAL:
-                printf("%lf", Expr->as.real_literal.Value);
-                break;
-        case EXPR_TYPE_LITERAL_NUM:
-                printf("%zu", Expr->as.integer_literal.Value);
-                break;
-
-        case EXPR_TYPE_VAR:
-                printf("%s", Expr->as.var.Name);
-                break;
-
-        case EXPR_TYPE_BINARY_OP:
-                printf("(");
-                DisplayExpression(Expr->as.binary.Lhs);
-
-                switch (Expr->as.binary.Operator)
-                {
-                case TOKEN_EXPR_ADD:
-                        printf(" + ");
-                        break;
-                case TOKEN_EXPR_SUB:
-                        printf(" - ");
-                        break;
-                case TOKEN_EXPR_MUL:
-                        printf(" * ");
-                        break;
-                case TOKEN_EXPR_DIV:
-                        printf(" / ");
-                        break;
-                default:
-                        printf(" ? ");
-                        break;
-                }
-
-                DisplayExpression(Expr->as.binary.Rhs);
-                printf(")");
-                break;
-
-        case EXPR_TYPE_ASSIGNMENT:
-                DisplayExpression(Expr->as.assignment.Lhs);
-                printf(" = ");
-                DisplayExpression(Expr->as.assignment.Rhs);
-                break;
-
-        case EXPR_TYPE_FUNCTION:
-                printf("%s(", Expr->as.fun.Name);
-                DisplayExpression(Expr->as.fun.Body);
-                printf(")");
-                break;
-
-        default:
-                printf("<?>");
-                break;
-        }
-}
-
 void DisplayExpressionTree(EXPRESSION *Expr, int Depth)
 {
         EXPRESSION *Stmt;
@@ -562,6 +554,14 @@ void DisplayExpressionTree(EXPRESSION *Expr, int Depth)
 
         switch (Expr->Type)
         {
+        case EXPR_TYPE_ACCESS:
+                printf("Index:\n");
+                DisplayExpressionTree(Expr->as.access.Index, Depth + 1);
+                for (int i = 0; i < Depth; i++)
+                        printf("  ");
+                printf("Into:\n");
+                DisplayExpressionTree(Expr->as.access.Expr, Depth + 1);
+                break;
         case EXPR_TYPE_DECLARATION:
                 printf("Declare, ");
                 printf("%s ", Expr->as.declaration.Name);
@@ -574,8 +574,14 @@ void DisplayExpressionTree(EXPRESSION *Expr, int Depth)
                         printf("[%zu]", Expr->as.declaration.Type.Variant.Dim[i]);
                 }
 
+                if (Expr->as.declaration.Type.Constant)
+                        printf("const ");
                 if (!Expr->as.declaration.Type.IsStructure)
-                        printf("u%zu\n", Expr->as.declaration.Type.as.normal.Bits);
+                {
+                        printf("%c%zu\n",
+                               Expr->as.declaration.Type.as.normal.Signed ? 'i' : 'u',
+                               Expr->as.declaration.Type.as.normal.Bits);
+                }
                 else if (Expr->as.declaration.Type.as.structure.StructureName)
                         printf("%s\n", Expr->as.declaration.Type.as.structure.StructureName);
                 DisplayExpressionTree(Expr->as.declaration.Init, Depth + 1);
@@ -606,7 +612,7 @@ void DisplayExpressionTree(EXPRESSION *Expr, int Depth)
                 break;
 
         case EXPR_TYPE_VAR:
-                printf("Variable: %s\n", Expr->as.var.Name);
+                printf("Variable: %s\n", Expr->as.variable.Name);
                 break;
 
         case EXPR_TYPE_BINARY_OP:

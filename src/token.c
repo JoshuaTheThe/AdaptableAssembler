@@ -14,7 +14,10 @@ static const STRING Keywords[] =
         "int16",
         "int8",
         "real",
+        "unsigned",
+        "const",
         "struct",
+        "return",
 };
 
 static TOKEN GetNumber(ArborState *State)

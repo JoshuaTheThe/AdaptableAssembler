@@ -1,5 +1,6 @@
-fn main(argc int, argv **int)
+fn main(argc int, argv **int8) int
 {
-        let buff [256]int8;
-        print("Hello, World!");
+        let k [1024]int;
+        k[1] = 10 * 17;
+        return k[1];
 }

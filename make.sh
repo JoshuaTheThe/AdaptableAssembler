@@ -3,7 +3,8 @@ clang src/label.c -o obj/label.o -c -g0 -Wall -Wextra -pedantic -Weverything
 clang src/state.c -o obj/state.o -c -g0 -Wall -Wextra -pedantic -Weverything
 clang src/token.c -o obj/token.o -c -g0 -Wall -Wextra -pedantic -Weverything
 clang src/parser.c -o obj/parser.o -c -g0 -Wall -Wextra -pedantic -Weverything
+zig cc -c src/codegen.zig -o obj/codegen.o -I./src/
 
-clang obj/main.o obj/label.o obj/state.o obj/token.o obj/parser.o -o bin/ar
+clang obj/main.o obj/label.o obj/state.o obj/token.o obj/parser.o obj/codegen.o -o bin/ar
 
 ./bin/ar test.arbor test.s

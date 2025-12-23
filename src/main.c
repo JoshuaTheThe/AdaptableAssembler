@@ -22,6 +22,8 @@ void *Aalloc(SIZE sz)
         return P;
 }
 
+void GenerateForExpr(EXPRESSION *Expr);
+
 int main(int argc, char **argv)
 {
         /* Checks and Init */
@@ -59,7 +61,8 @@ int main(int argc, char **argv)
         State.CurrentToken = GetToken(&State);
         State.Expressions = ParseStatements(&State);
         Expr = State.Expressions;
-        DisplayExpressionTree(Expr, 0);
+        //DisplayExpressionTree(Expr, 0);
+        GenerateForExpr(Expr);
 
         /* Cleanup */
         DeleteLabels(&State);

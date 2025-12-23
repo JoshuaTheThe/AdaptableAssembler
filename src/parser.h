@@ -22,6 +22,8 @@ typedef enum
         EXPR_TYPE_LITERAL_REAL,
         EXPR_TYPE_DECLARATION,
         EXPR_TYPE_STRUCTURE,
+        EXPR_TYPE_ACCESS,
+        EXPR_TYPE_RETURN,
 } EXPRESSIONTYPE;
 
 typedef struct EXPRESSION EXPRESSION;
@@ -56,6 +58,7 @@ typedef struct TYPE
                 } structure;
         } as;
         TYPEVARIANT Variant;
+        BOOL Constant;
         BOOL IsStructure;
 } TYPE;
 
@@ -67,13 +70,14 @@ struct EXPRESSION
                 {
                         EXPRESSION *Params;
                         EXPRESSION *Body;
+                        TYPE ReturnType;
                         char *Name;
                 } fun;
 
                 struct
                 {
                         char *Name;
-                } var;
+                } variable;
 
                 struct
                 {
@@ -95,6 +99,12 @@ struct EXPRESSION
                         TOKENTYPE Operator;
                         int padd;
                 } binary;
+
+                struct
+                {
+                        EXPRESSION *Expr;
+                        EXPRESSION *Index;
+                } access;
 
                 struct
                 {
@@ -136,6 +146,8 @@ struct EXPRESSION
                         EXPRESSION *Body;
                         char *Name;
                 } structure;
+
+                EXPRESSION *return_statement;
         } as;
         EXPRESSION *Next;
         EXPRESSIONTYPE Type;
@@ -161,7 +173,6 @@ EXPRESSION *ParseSuffix(ArborState *State, EXPRESSION *Expr);
 EXPRESSION *ParseArguments(ArborState *State);
 EXPRESSION *ParseDeclaration(ArborState *State);
 TYPE ParseType(ArborState *State);
-void DisplayExpression(EXPRESSION *Expr);
 void DisplayExpressionTree(EXPRESSION *Expr, int);
 EXPRESSION *ParseStruct(ArborState *State);
 

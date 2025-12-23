@@ -96,7 +96,10 @@ typedef enum
         TOKEN_INT16,
         TOKEN_INT8,
         TOKEN_REAL,
+        TOKEN_UNSIGNED,
+        TOKEN_CONSTANT,
         TOKEN_STRUCT,
+        TOKEN_RETURN,
 } TOKENTYPE;
 
 typedef struct TOKEN
