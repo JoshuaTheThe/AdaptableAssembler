@@ -1,5 +1,7 @@
 #include "parser.h"
 
+static EXPRESSION *RootExpr = NULL;
+
 _Noreturn static void TODO(const char *x)
 {
         printf("TODO: %s\n", x);
@@ -19,6 +21,7 @@ static EXPRESSION *Literal(SIZE Value)
         EXPRESSION *Expr = new (EXPRESSION);
         Expr->Type = EXPR_TYPE_LITERAL_NUM;
         Expr->as.integer_literal.Value = Value;
+        Expr->Parent = RootExpr;
         return (Expr);
 }
 
@@ -27,6 +30,7 @@ static EXPRESSION *RealLiteral(REAL Value)
         EXPRESSION *Expr = new (EXPRESSION);
         Expr->Type = EXPR_TYPE_LITERAL_REAL;
         Expr->as.real_literal.Value = Value;
+        Expr->Parent = RootExpr;
         return (Expr);
 }
 
@@ -35,6 +39,7 @@ static EXPRESSION *StringLiteral(const char *Data)
         EXPRESSION *Expr = new (EXPRESSION);
         Expr->Type = EXPR_TYPE_LITERAL_STR;
         Expr->as.string_literal.Data = Data;
+        Expr->Parent = RootExpr;
         return (Expr);
 }
 
@@ -43,6 +48,23 @@ static EXPRESSION *Variable(char *Name)
         EXPRESSION *Expr = new (EXPRESSION);
         Expr->Type = EXPR_TYPE_VAR;
         Expr->as.variable.Name = Name;
+        Expr->Parent = RootExpr;
+        return (Expr);
+}
+
+static EXPRESSION *Extern(char *Name, EXPRESSION *Params, TYPE ReturnType)
+{
+        EXPRESSION *Expr = new (EXPRESSION);
+        Expr->Type = EXPR_TYPE_EXTERN;
+        Expr->as.ext.Name = Name;
+        Expr->as.ext.Params = Params;
+        Expr->as.ext.ReturnType = ReturnType;
+        Expr->Parent = RootExpr;
+        while (Params)
+        {
+                Params->Parent = Expr;
+                Params = Params->Next;
+        }
         return (Expr);
 }
 
@@ -54,6 +76,17 @@ static EXPRESSION *Function(char *Name, EXPRESSION *Body, EXPRESSION *Params, TY
         Expr->as.fun.Body = Body;
         Expr->as.fun.Params = Params;
         Expr->as.fun.ReturnType = ReturnType;
+        Expr->Parent = RootExpr;
+        while (Body)
+        {
+                Body->Parent = Expr;
+                Body = Body->Next;
+        }
+        while (Params)
+        {
+                Params->Parent = Expr;
+                Params = Params->Next;
+        }
         return (Expr);
 }
 
@@ -63,6 +96,11 @@ static EXPRESSION *Assignment(EXPRESSION *Lhs, EXPRESSION *Rhs)
         Expr->Type = EXPR_TYPE_ASSIGNMENT;
         Expr->as.assignment.Lhs = Lhs;
         Expr->as.assignment.Rhs = Rhs;
+        Expr->Parent = RootExpr;
+        if (Lhs)
+                Lhs->Parent = Expr;
+        if (Rhs)
+                Rhs->Parent = Expr;
         return (Expr);
 }
 
@@ -73,6 +111,11 @@ static EXPRESSION *Binary(EXPRESSION *Lhs, EXPRESSION *Rhs, TOKENTYPE Op)
         Expr->as.binary.Lhs = Lhs;
         Expr->as.binary.Rhs = Rhs;
         Expr->as.binary.Operator = Op;
+        Expr->Parent = RootExpr;
+        if (Lhs)
+                Lhs->Parent = Expr;
+        if (Rhs)
+                Rhs->Parent = Expr;
         return (Expr);
 }
 
@@ -83,6 +126,19 @@ static EXPRESSION *If(EXPRESSION *Body, EXPRESSION *ElseBody, EXPRESSION *Condit
         Expr->as.ifelse.Conditional = Conditional;
         Expr->as.ifelse.Body = Body;
         Expr->as.ifelse.ElseBody = ElseBody;
+        Expr->Parent = RootExpr;
+        while (Body)
+        {
+                Body->Parent = Expr;
+                Body = Body->Next;
+        }
+        while (ElseBody)
+        {
+                ElseBody->Parent = Expr;
+                ElseBody = ElseBody->Next;
+        }
+        if (Conditional)
+                Conditional->Parent = Expr;
         return (Expr);
 }
 
@@ -92,6 +148,9 @@ static EXPRESSION *Unary(EXPRESSION *UnaryExpr, TOKENTYPE Op)
         Expr->Type = EXPR_TYPE_UNARY_OP;
         Expr->as.unary.Operand = UnaryExpr;
         Expr->as.unary.Operator = Op;
+        Expr->Parent = RootExpr;
+        if (UnaryExpr)
+                UnaryExpr->Parent = Expr;
         return (Expr);
 }
 
@@ -102,6 +161,9 @@ static EXPRESSION *Declaration(char *Name, EXPRESSION *Init, TYPE Type)
         Expr->as.declaration.Init = Init;
         Expr->as.declaration.Name = Name;
         Expr->as.declaration.Type = Type;
+        Expr->Parent = RootExpr;
+        if (Init)
+                Init->Parent = Expr;
         return (Expr);
 }
 
@@ -111,6 +173,9 @@ static EXPRESSION *Structure(char *Name, EXPRESSION *Body)
         Expr->Type = EXPR_TYPE_STRUCTURE;
         Expr->as.structure.Body = Body;
         Expr->as.structure.Name = Name;
+        Expr->Parent = RootExpr;
+        if (Body)
+                Body->Parent = Expr;
         return (Expr);
 }
 
@@ -121,6 +186,11 @@ static EXPRESSION *Call(EXPRESSION *Callee, EXPRESSION *Args)
         Expr->as.call.Callee = Callee;
         Expr->as.call.Args = Args;
         Expr->as.call.ArgCount = Count(Args);
+        Expr->Parent = RootExpr;
+        if (Callee)
+                Callee->Parent = Expr;
+        if (Args)
+                Args->Parent = Expr;
         return (Expr);
 }
 
@@ -130,6 +200,11 @@ static EXPRESSION *Access(EXPRESSION *Expression, EXPRESSION *Index)
         Expr->Type = EXPR_TYPE_ACCESS;
         Expr->as.access.Expr = Expression;
         Expr->as.access.Index = Index;
+        Expr->Parent = RootExpr;
+        if (Expression)
+                Expression->Parent = Expr;
+        if (Index)
+                Index->Parent = Expr;
         return (Expr);
 }
 
@@ -138,6 +213,9 @@ static EXPRESSION *Return(EXPRESSION *Expression)
         EXPRESSION *Expr = new (EXPRESSION);
         Expr->Type = EXPR_TYPE_RETURN;
         Expr->as.return_statement = Expression;
+        Expr->Parent = RootExpr;
+        if (Expression)
+                Expression->Parent = Expr;
         return (Expr);
 }
 
@@ -226,7 +304,7 @@ EXPRESSION *ParseSuffix(ArborState *State, EXPRESSION *Expr)
         else if (State->CurrentToken.Type == TOKEN_EXPR_LSPAREN)
         {
                 State->CurrentToken = GetToken(State);
-                Arguments = ParseArguments(State);
+                Arguments = ParseExpression(State);
                 State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_EXPR_RSPAREN);
                 Expr = Access(Initial, Arguments);
                 return ParseSuffix(State, Expr);
@@ -271,7 +349,8 @@ EXPRESSION *ParseTerm(ArborState *State)
 {
         EXPRESSION *Left = ParsePrefix(State), *Right = NULL;
         while (State->CurrentToken.Type == TOKEN_EXPR_MUL ||
-               State->CurrentToken.Type == TOKEN_EXPR_DIV)
+               State->CurrentToken.Type == TOKEN_EXPR_DIV ||
+               State->CurrentToken.Type == TOKEN_EXPR_MOD)
         {
                 TOKENTYPE Op = State->CurrentToken.Type;
                 State->CurrentToken = GetToken(State);
@@ -283,7 +362,7 @@ EXPRESSION *ParseTerm(ArborState *State)
         return Left;
 }
 
-EXPRESSION *ParseExpression(ArborState *State)
+EXPRESSION *ParseAdditiveExpression(ArborState *State)
 {
         EXPRESSION *Left = ParseTerm(State), *Right = NULL;
 
@@ -293,6 +372,39 @@ EXPRESSION *ParseExpression(ArborState *State)
                 TOKENTYPE Op = State->CurrentToken.Type;
                 State->CurrentToken = GetToken(State);
                 Right = ParseTerm(State);
+                Left = Binary(Left, Right, Op);
+        }
+
+        return Left;
+}
+
+EXPRESSION *ParseEqualityExpression(ArborState *State)
+{
+        EXPRESSION *Left = ParseAdditiveExpression(State), *Right = NULL;
+
+        while (State->CurrentToken.Type == TOKEN_EXPR_EQEQ ||
+               State->CurrentToken.Type == TOKEN_EXPR_LESS ||
+               State->CurrentToken.Type == TOKEN_EXPR_GREATER )
+        {
+                TOKENTYPE Op = State->CurrentToken.Type;
+                State->CurrentToken = GetToken(State);
+                Right = ParseAdditiveExpression(State);
+                Left = Binary(Left, Right, Op);
+        }
+
+        return Left;
+}
+
+EXPRESSION *ParseExpression(ArborState *State)
+{
+        EXPRESSION *Left = ParseEqualityExpression(State), *Right = NULL;
+
+        while (State->CurrentToken.Type == TOKEN_EXPR_CHAIN_AND ||
+               State->CurrentToken.Type == TOKEN_EXPR_CHAIN_OR)
+        {
+                TOKENTYPE Op = State->CurrentToken.Type;
+                State->CurrentToken = GetToken(State);
+                Right = ParseEqualityExpression(State);
                 Left = Binary(Left, Right, Op);
         }
 
@@ -336,6 +448,29 @@ EXPRESSION *ParseFunction(ArborState *State)
         TYPE Type = ParseType(State);
         Body = ParseStatement(State);
         return Function(Name, Body, Params, Type);
+}
+
+EXPRESSION *ParseExtern(ArborState *State)
+{
+        char *Name = strdup(State->CurrentToken.Identifier);
+        EXPRESSION *Params = {0};
+        State->CurrentToken = GetToken(State);
+        State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_EXPR_LPAREN);
+        while (State->CurrentToken.Type != TOKEN_EXPR_RPAREN)
+        {
+                if (State->CurrentToken.Type == TOKEN_IDENTIFIER)
+                {
+                        char *Name1 = strdup(State->CurrentToken.Identifier);
+                        State->CurrentToken = GetToken(State);
+                        TYPE Type = ParseType(State);
+                        AppendExpr(&Params, Declaration(Name1, NULL, Type));
+                        if (State->CurrentToken.Type != TOKEN_EXPR_RPAREN)
+                                State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_EXPR_COMMA);
+                }
+        }
+        State->CurrentToken = ExpectToken(State->CurrentToken, State, TOKEN_EXPR_RPAREN);
+        TYPE Type = ParseType(State);
+        return Extern(Name, Params, Type);
 }
 
 EXPRESSION *ParseIf(ArborState *State)
@@ -470,6 +605,16 @@ EXPRESSION *ParseStatement(ArborState *State)
         EXPRESSION *Expr = NULL, *Sub;
         switch (State->CurrentToken.Type)
         {
+        case TOKEN_EXTERN:
+                State->CurrentToken = GetToken(State);
+                Expr = ParseExtern(State);
+                if (State->CurrentToken.Type != TOKEN_END)
+                {
+                        printf("Expected end of statement, got token type: %d\n",
+                               State->CurrentToken.Type);
+                }
+                State->CurrentToken = GetToken(State);
+                break;
         case TOKEN_RETURN:
                 State->CurrentToken = GetToken(State);
                 Expr = ParseReturn(State);
@@ -545,7 +690,6 @@ EXPRESSION *ParseStatements(ArborState *State)
 
 void DisplayExpressionTree(EXPRESSION *Expr, int Depth)
 {
-        EXPRESSION *Stmt;
         if (!Expr)
                 return;
 

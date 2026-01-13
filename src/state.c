@@ -44,6 +44,7 @@ ArborState NewState(void)
         ArborState State = {0};
         memset(&State, 0, sizeof(State));
         State.CheckSum = STATE_CHECKSUM;
+        State.TranslationUnit.CurrentScope = &State.TranslationUnit.GlobalScope;
         return (State);
 }
 

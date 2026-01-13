@@ -1,6 +1,13 @@
+extern print(p_i8 *int8) int;
+
+fn x() int
+{
+	let y int;
+	return y;
+}
+
 fn main(argc int, argv **int8) int
 {
-        let k [1024]int;
-        k[1] = 10 * 17;
-        return k[1];
+	x();
+	return 1;
 }

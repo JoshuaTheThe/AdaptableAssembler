@@ -7,6 +7,7 @@
 #include "state.h"
 #include "token.h"
 #include "parser.h"
+#include "codegen.h"
 
 void AssembleFoo(void);
 
@@ -22,15 +23,13 @@ void *Aalloc(SIZE sz)
         return P;
 }
 
-void GenerateForExpr(EXPRESSION *Expr);
-
 int main(int argc, char **argv)
 {
         /* Checks and Init */
         ArborState State;
+        /* Unused, in future, codegen will use custom arch */
         ARCHITECTURE Arch;
         INSTRUCTION Instruction;
-        EXPRESSION *Expr;
         if (argc != 3)
         {
                 printf("Invalid Usage\n%s <source> <output>\n", argv[0]);
@@ -39,9 +38,12 @@ int main(int argc, char **argv)
 
         State = NewState();
         State.Assembly = fopen(argv[1], "r");
-        if (!State.Assembly)
+        State.Output = fopen(argv[2], "w");
+        if (!State.Assembly || !State.Output)
         {
-                printf("Could not open file %s\n", argv[1]);
+                printf("Could not open file %s or %s\n", argv[1], argv[2]);
+                if (State.Assembly) fclose(State.Assembly);
+                if (State.Output) fclose(State.Output);
                 return 1;
         }
 
@@ -59,13 +61,14 @@ int main(int argc, char **argv)
 
         /* Main tokenising loop */
         State.CurrentToken = GetToken(&State);
-        State.Expressions = ParseStatements(&State);
-        Expr = State.Expressions;
-        //DisplayExpressionTree(Expr, 0);
-        GenerateForExpr(Expr);
+        EXPRESSION *AST = ParseStatements(&State);
+        DisplayExpressionTree(AST, 0);
+        EmitStart(&State);
+        GenerateForExpr(&State, AST);
 
         /* Cleanup */
         DeleteLabels(&State);
         fclose(State.Assembly);
+        fclose(State.Output);
         return (0);
 }

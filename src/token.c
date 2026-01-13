@@ -18,13 +18,13 @@ static const STRING Keywords[] =
         "const",
         "struct",
         "return",
+        "extern",
 };
 
 static TOKEN GetNumber(ArborState *State)
 {
         TOKEN Token = {0};
         int chr;
-        int has_decimal = 0;
         int has_exponent = 0;
         int exponent_sign = 1;
         double fraction = 0.1;
@@ -71,7 +71,6 @@ static TOKEN GetNumber(ArborState *State)
         if (chr == '.')
         {
                 Token.Type = TOKEN_REAL;
-                has_decimal = 1;
                 chr = getc(State->Assembly);
 
                 while (isdigit(chr))
@@ -262,13 +261,35 @@ TOKEN GetToken(ArborState *State)
         {
                 Token.Type = TOKEN_EXPR_DIV;
         }
+        else if (chr == '%')
+        {
+                Token.Type = TOKEN_EXPR_MOD;
+        }
         else if (chr == '&')
         {
-                Token.Type = TOKEN_EXPR_AND;
+                chr = getc(State->Assembly);
+                if (chr == '&')
+                {
+                        Token.Type = TOKEN_EXPR_CHAIN_AND;
+                }
+                else
+                {
+                        ungetc(chr, State->Assembly);
+                        Token.Type = TOKEN_EXPR_AND;
+                }
         }
         else if (chr == '|')
         {
-                Token.Type = TOKEN_EXPR_OR;
+                chr = getc(State->Assembly);
+                if (chr == '|')
+                {
+                        Token.Type = TOKEN_EXPR_CHAIN_OR;
+                }
+                else
+                {
+                        ungetc(chr, State->Assembly);
+                        Token.Type = TOKEN_EXPR_OR;
+                }
         }
         else if (chr == '^')
         {
@@ -292,7 +313,16 @@ TOKEN GetToken(ArborState *State)
         }
         else if (chr == '=')
         {
-                Token.Type = TOKEN_EXPR_EQ;
+                chr = getc(State->Assembly);
+                if (chr == '=')
+                {
+                        Token.Type = TOKEN_EXPR_EQEQ;
+                }
+                else
+                {
+                        ungetc(chr, State->Assembly);
+                        Token.Type = TOKEN_EXPR_EQ;
+                }
         }
         else if (chr == ';')
         {
@@ -317,6 +347,14 @@ TOKEN GetToken(ArborState *State)
         else if (chr == ']')
         {
                 Token.Type = TOKEN_EXPR_RSPAREN;
+        }
+        else if (chr == '<')
+        {
+                Token.Type = TOKEN_EXPR_LESS;
+        }
+        else if (chr == '>')
+        {
+                Token.Type = TOKEN_EXPR_GREATER;
         }
         else if (chr == '"')
         {

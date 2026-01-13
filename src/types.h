@@ -71,6 +71,7 @@ typedef enum
         TOKEN_EXPR_SUB,
         TOKEN_EXPR_MUL,
         TOKEN_EXPR_DIV,
+        TOKEN_EXPR_MOD,
         TOKEN_EXPR_AND,
         TOKEN_EXPR_OR,
         TOKEN_EXPR_XOR,
@@ -84,6 +85,11 @@ typedef enum
         TOKEN_EXPR_COMPLEMENT,
         TOKEN_EXPR_LSPAREN,
         TOKEN_EXPR_RSPAREN,
+        TOKEN_EXPR_LESS,
+        TOKEN_EXPR_GREATER,
+        TOKEN_EXPR_EQEQ,
+        TOKEN_EXPR_CHAIN_AND,
+        TOKEN_EXPR_CHAIN_OR,
 
         TOKEN_KEYWORDS,
         TOKEN_LET = TOKEN_KEYWORDS,
@@ -100,6 +106,7 @@ typedef enum
         TOKEN_CONSTANT,
         TOKEN_STRUCT,
         TOKEN_RETURN,
+        TOKEN_EXTERN,
 } TOKENTYPE;
 
 typedef struct TOKEN
@@ -111,10 +118,232 @@ typedef struct TOKEN
         int Padd;
 } TOKEN;
 
+/* Parsing */
+
+typedef enum
+{
+        EXPR_TYPE_NONE,
+        EXPR_TYPE_VAR,
+        EXPR_TYPE_FUNCTION,
+        EXPR_TYPE_ASSIGNMENT,
+        EXPR_TYPE_CALL,
+        EXPR_TYPE_BINARY_OP,
+        EXPR_TYPE_IFELSE,
+        EXPR_TYPE_UNARY_OP,
+        EXPR_TYPE_LITERAL_NUM,
+        EXPR_TYPE_LITERAL_STR,
+        EXPR_TYPE_LITERAL_REAL,
+        EXPR_TYPE_DECLARATION,
+        EXPR_TYPE_STRUCTURE,
+        EXPR_TYPE_ACCESS,
+        EXPR_TYPE_RETURN,
+        EXPR_TYPE_EXTERN,
+} EXPRESSIONTYPE;
+
+typedef struct EXPRESSION EXPRESSION;
+
+typedef EXPRESSION *PARAM;
 typedef struct
 {
-        /**
-         * Assume Worst case */
+        SIZE Count;
+        PARAM *Params;
+} PARAMS;
+
+typedef struct
+{
+        // 0 - being value
+        SIZE Depth;
+        SIZE Dim[8]; /* Dimensions, 0 being value, e.g. 2x2 */
+        SIZE DimCount;
+} TYPEVARIANT;
+
+typedef struct TYPE
+{
+        union
+        {
+                struct
+                {
+                        SIZE Bits;
+                        BOOL Signed;
+                } normal;
+                struct
+                {
+                        char *StructureName;
+                } structure;
+        } as;
+        TYPEVARIANT Variant;
+        BOOL Constant;
+        BOOL IsStructure;
+} TYPE;
+
+struct EXPRESSION
+{
+        union
+        {
+                struct
+                {
+                        EXPRESSION *Params;
+                        EXPRESSION *Body;
+                        TYPE ReturnType;
+                        char *Name;
+                        void *Vars;
+                } fun;
+
+                struct
+                {
+                        EXPRESSION *Params;
+                        TYPE ReturnType;
+                        char *Name;
+                } ext;
+
+                struct
+                {
+                        char *Name;
+                } variable;
+
+                struct
+                {
+                        EXPRESSION *Lhs;
+                        EXPRESSION *Rhs;
+                } assignment;
+
+                struct
+                {
+                        EXPRESSION *Callee;
+                        EXPRESSION *Args;
+                        SIZE ArgCount;
+                } call;
+
+                struct
+                {
+                        EXPRESSION *Lhs;
+                        EXPRESSION *Rhs;
+                        TOKENTYPE Operator;
+                        int padd;
+                } binary;
+
+                struct
+                {
+                        EXPRESSION *Expr;
+                        EXPRESSION *Index;
+                } access;
+
+                struct
+                {
+                        EXPRESSION *Operand;
+                        TOKENTYPE Operator;
+                        int padd;
+                } unary;
+
+                struct
+                {
+                        SIZE Value;
+                } integer_literal;
+
+                struct
+                {
+                        double Value;
+                } real_literal;
+
+                struct
+                {
+                        const char *Data;
+                        SIZE Value;
+                } string_literal;
+
+                struct
+                {
+                        TYPE Type;
+                        EXPRESSION *Init;
+                        char *Name;
+                } declaration;
+
+                struct
+                {
+                        EXPRESSION *Conditional, *Body, *ElseBody;
+                } ifelse;
+
+                struct
+                {
+                        EXPRESSION *Body;
+                        char *Name;
+                } structure;
+
+                EXPRESSION *return_statement;
+        } as;
+        EXPRESSION *Next;
+        EXPRESSION *Parent;
+        EXPRESSIONTYPE Type;
+        TYPE CompileType;
+        int padd;
+};
+
+struct AST
+{
+        SIZE ExprCount;
+        EXPRESSION *RootExpr;
+};
+
+/* Code Generation */
+
+struct VARIABLE;
+typedef struct VARIABLE VARIABLE;
+
+struct SCOPE;
+struct STRUCTURE;
+struct TSTRING;
+typedef struct SCOPE SCOPE;
+typedef struct STRUCTURE STRUCTURE;
+typedef struct TSTRING TSTRING;
+
+typedef struct VARIABLE
+{
+        TYPE Type;
+        const char *Name;
+        EXPRESSION *Expr;
+        VARIABLE *Next, *Child, *Parent;
+        long Address; /* EBP Offset or absolute */
+        size_t SizeOf;
+        BOOL IsOffset;
+        BOOL IsParameter;
+        BOOL IsFunction;
+        BOOL IsAuto;
+} VARIABLE;
+
+typedef struct TSTRING
+{
+        const char *CStr;
+        size_t Length;
+        TSTRING *Next, *Child, *Parent;
+} TSTRING;
+
+typedef struct STRUCTURE
+{
+        const char *Name;
+        EXPRESSION *Body;
+        STRUCTURE *Next, *Child, *Parent;
+} STRUCTURE;
+
+typedef struct SCOPE
+{
+        VARIABLE *Vars;
+        STRUCTURE *DataTypes;
+        SCOPE *Next, *Child, *Parent;
+        long BpOff;
+} SCOPE;
+
+typedef struct TRANSLATION
+{
+        SCOPE GlobalScope, *CurrentScope;
+        TSTRING *StringTable;
+        size_t StringCount;
+} TRANSLATION;
+
+/* Unifier */
+
+typedef struct
+{
+        TRANSLATION TranslationUnit;
         LABEL *LabelsHead;
         LABEL *LabelsTail;
         SIZE CheckSum;
@@ -123,8 +352,6 @@ typedef struct
         FILE *Output;
         ARCHITECTURE *Arch;
         TOKEN CurrentToken;
-        void *Ast;
-        void *Expressions;
 } ArborState;
 
 #ifndef NDEBUG
@@ -138,5 +365,38 @@ typedef struct
 #endif
 
 void *Aalloc(SIZE sz);
+
+/**
+ * T *x = ...
+ * T *y = init_T(...)
+ * ll_append(&x, y)
+ */
+#define ll_append(x, y)                                 \
+        do                                              \
+        {                                               \
+                if (!(*(x)))                            \
+                {                                       \
+                        (*(x)) = y;                     \
+                }                                       \
+                else                                    \
+                {                                       \
+                        if ((*(x))->Next)               \
+                        {                               \
+                                y->Next = (*(x))->Next; \
+                        }                               \
+                        (*(x))->Next = y;               \
+                }                                       \
+        } while (0);
+
+#define ll_append_child(x, y)                    \
+        do                                       \
+        {                                        \
+                if ((*x)->Child)                 \
+                {                                \
+                        (y)->Next = (*x)->Child; \
+                }                                \
+                (*x)->Child = y;                 \
+                (y)->Parent = (*x);              \
+        } while (0)
 
 #endif
